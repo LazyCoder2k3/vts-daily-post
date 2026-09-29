@@ -1,0 +1,68 @@
+name: VTS daily Strava post
+
+on:
+  schedule:
+    - cron: "23 17 * * *"   # 00:23 giờ VN – chụp bảng /ranking
+    - cron: "17 23 * * *"   # 06:17 giờ VN – soạn bài và gửi qua Telegram
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Lệnh cần chạy"
+        type: choice
+        options: [post, snapshot, post-dry-run]
+        default: post
+
+permissions:
+  contents: write            # để lưu snapshot/bài đăng ngược vào repo
+
+concurrency:
+  group: vts-daily
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Chọn lệnh
+        id: cmd
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then c="${{ inputs.command }}"
+          elif [ "${{ github.event.schedule }}" = "23 17 * * *" ]; then c="snapshot"
+          else c="post"; fi
+          [ "$c" = "post-dry-run" ] && c="post --dry-run"
+          echo "args=$c" >> "$GITHUB_OUTPUT"
+          echo "Lệnh: $c"
+
+      - name: Chạy bot
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION_STRING: ${{ secrets.TG_SESSION_STRING }}
+          NOTIFY_BOT_TOKEN: ${{ secrets.NOTIFY_BOT_TOKEN }}
+          NOTIFY_CHAT_ID: ${{ secrets.NOTIFY_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          HASHTAGS: ${{ vars.HASHTAGS }}
+          SHOW_DAILY_KM: ${{ vars.SHOW_DAILY_KM }}
+        run: python main.py ${{ steps.cmd.outputs.args }}
+
+      - name: Lưu dữ liệu vào repo
+        if: always()
+        run: |
+          git config user.name "vts-daily-bot"
+          git config user.email "vts-daily-bot@users.noreply.github.com"
+          git add data || exit 0
+          if git diff --cached --quiet; then echo "Không có dữ liệu mới"; exit 0; fi
+          git commit -m "data: $(TZ=Asia/Ho_Chi_Minh date '+%Y-%m-%d %H:%M')"
+          git pull --rebase && git push
