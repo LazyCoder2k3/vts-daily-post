@@ -48,6 +48,9 @@ OPENERS = {
         "Sáng sớm hay tối muộn đều được, miễn là hôm nay có thêm vài km trên Strava!",
         "Bảng xếp hạng vẫn đang rất mở, chưa có gì là chắc chắn cả!",
         "Còn {days_left} ngày — vẫn đủ thời gian để bất kỳ ai tạo nên bất ngờ.",
+        "Một buổi chạy ngắn cũng có thể làm ngày hôm nay khác hẳn. Mình cùng bắt đầu nhé!",
+        "Bền bỉ mỗi ngày một chút, đến cuối giải nhìn lại sẽ thấy thành quả rất lớn.",
+        "Không cần áp lực thành tích, chỉ cần đều đặn là bạn đã thắng chính mình rồi.",
     ],
     "monday": [
         "Thứ Hai rồi! Khởi động tuần mới bằng vài km nhẹ nhàng để lấy năng lượng cho cả tuần nhé 💪",
@@ -87,6 +90,8 @@ LEAD_INTROS = [
     "Ba \"đầu tàu\" của VTS Running Club:",
     "Đang cầm cờ dẫn đầu cuộc đua:",
     "Top 3 tính đến sáng nay:",
+    "Nhóm dẫn đầu hôm nay gọi tên:",
+    "Top 3 tạm thời của đường đua:",
 ]
 
 DAILY_INTROS = [
@@ -97,6 +102,8 @@ DAILY_INTROS = [
     "Vinh danh {period}:",
     "Bứt phá {period}:",
     "Chăm chỉ nhất {period}:",
+    "Bảng vàng {period}:",
+    "Top tăng tốc {period}:",
 ]
 
 TIPS = [
@@ -115,6 +122,8 @@ TIPS = [
     "Chưa đăng ký với @tdht_bot? Gõ /register và nhập Runner ID (xem ở /list) để theo dõi km của mình.",
     "Mục tiêu của giải là {target} km trong {total_days} ngày — trung bình chỉ {per_day} km mỗi ngày, ai cũng làm được!",
     "Cơ cấu giải: 1 Nhất, 1 Nhì, 1 Ba và 2 giải phụ (chạy đều nhất, VĐV nữ xuất sắc nhất).",
+    "Nếu bận, chia nhỏ thành 2 buổi trong ngày vẫn hiệu quả và dễ giữ nhịp hơn.",
+    "Theo dõi nhịp tim trong lúc chạy để giữ sức bền, đặc biệt ở các buổi recovery.",
 ]
 
 CLOSINGS = {
@@ -127,6 +136,8 @@ CLOSINGS = {
         "Không ai bị bỏ lại phía sau — cùng nhau về đích nhé!",
         "Tag một đồng nghiệp bạn muốn rủ chạy chiều nay đi! 😄",
         "Chạy vì sức khỏe, vì tinh thần, vì {years} năm VTS! 🎉",
+        "Chúc cả nhà một ngày nhiều năng lượng và thêm thật nhiều km đẹp!",
+        "Giữ lửa mỗi ngày, vạch đích sẽ tự đến gần hơn thôi!",
     ],
     "last_week": [
         "Tăng tốc về đích thôi cả nhà! 🏁",
@@ -163,14 +174,23 @@ def pick(pool: list[str], day: date, salt: str) -> str:
     return order[day.toordinal() % len(order)]
 
 
-def compare_distance(total: float) -> str:
+def compare_distance(total: float, day: date) -> str:
     if total < DISTANCES[0][0]:
         return "tích tiểu thành đại, rồi sẽ thành một chặng dài!"
     top_km, top_name = DISTANCES[-1]
     if total >= 2 * top_km:
         return f"gấp {total / top_km:.1f}".replace(".", ",") + f" lần quãng đường {top_name}!"
-    km, name = [d for d in DISTANCES if d[0] <= total][-1]
-    return f"đã vượt quãng đường {name} (khoảng {fmt_big(km)} km)!"
+    reached = [d for d in DISTANCES if d[0] <= total]
+    window = reached[-min(4, len(reached)):]
+    km, name = random.Random(f"dist:{day.toordinal()}:{round(total)}:{len(window)}").choice(window)
+    templates = [
+        "đã vượt quãng đường {name} (khoảng {km} km)!",
+        "đủ để chinh phục cung {name} (xấp xỉ {km} km)!",
+        "đã chạy nhiều hơn chặng {name} ({km} km)!",
+        "nếu ghép thành một hành trình thì đã qua mốc {name} (~{km} km)!",
+    ]
+    template = random.Random(f"dist-template:{day.toordinal()}:{round(total)}:{name}").choice(templates)
+    return template.format(name=name, km=fmt_big(km))
 
 
 # ----------------------------------------------------------------- context
@@ -268,7 +288,7 @@ def compose(ctx: dict) -> str:
         out.append(f"📊 {period_cap} có {daily['active']} anh chị em ghi nhận hoạt động hợp lệ, "
                    f"cả đội cộng thêm {fmt_km(daily['sum'])} km.")
     if ctx["grand"] > 0:
-        out.append(f"🌏 Tổng quãng đường cả đội: {fmt_big(ctx['grand'])} km — {compare_distance(ctx['grand'])}")
+        out.append(f"🌏 Tổng quãng đường cả đội: {fmt_big(ctx['grand'])} km — {compare_distance(ctx['grand'], ctx['today'])}")
     out.append("")
 
     if phase == "finale":
