@@ -2,9 +2,10 @@
 """VTS Running Club — bot soạn bài đăng Strava hằng ngày.
 
 Luồng hoạt động:
-  00:20  `snapshot`  userbot gửi /ranking cho @tdht_bot, lưu bảng tổng của ngày.
-  06:30  `post`      so sánh snapshot hôm nay với hôm trước -> top 3 km trong ngày,
-                     lấy top 3 bảng tổng, soạn bài, gửi bản nháp qua Telegram cho admin.
+  23:30  `snapshot`  userbot gửi /ranking + /today cho @tdht_bot, lưu bảng tổng
+                     và thống kê km trong ngày (đã quy đổi theo loại vận động).
+  07:00  `post`      dùng snapshot đêm qua để lấy top 3 bảng tổng và top 3 km hôm qua,
+                     soạn bài, gửi bản nháp qua Telegram cho admin.
 
 Lệnh:
   python main.py login            Đăng nhập userbot Telegram (1 lần, cần OTP) -> in ra TG_SESSION_STRING
@@ -39,6 +40,9 @@ DATA = BASE / "data"
 SNAP_DIR, POST_DIR, RAW_DIR = DATA / "snapshots", DATA / "posts", DATA / "raw"
 
 ROW_RE = re.compile(r"^\s*\|\s*(\d+)\s*\|\s*(.+?)\s*\|\s*(\d+(?:[.,]\d+)?)\s*\|\s*(\d+)\s*\|\s*$")
+TODAY_ROW_RE = re.compile(
+    r"^\s*\|\s*(.+?)\s*\|\s*([^|]+?)\s*\|\s*(\d+(?:[.,]\d+)?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$"
+)
 
 
 # ----------------------------------------------------------------- cấu hình
@@ -51,6 +55,7 @@ def env(name: str, default: str | None = None, required: bool = False) -> str:
 
 def load_cfg() -> dict:
     d = lambda s: date.fromisoformat(s)  # noqa: E731
+    csv = lambda s: [x.strip().lower() for x in s.split(",") if x.strip()]  # noqa: E731
     return {
         "start": d(env("EVENT_START", "2026-09-15")),
         "end": d(env("EVENT_END", "2026-10-14")),
@@ -59,6 +64,10 @@ def load_cfg() -> dict:
         "target_km": float(env("TARGET_KM", "45")),
         "hashtags": env("HASHTAGS", "#VTSRunningClub #8NamVTS"),
         "show_daily_km": env("SHOW_DAILY_KM", "1") == "1",
+        "daily_ride_factor": float(env("DAILY_RIDE_FACTOR", "0.25")),
+        "daily_swim_factor": float(env("DAILY_SWIM_FACTOR", "4")),
+        "daily_ride_types": csv(env("DAILY_RIDE_TYPES", "ride,bike,cycle,ebike,virtualride")),
+        "daily_swim_types": csv(env("DAILY_SWIM_TYPES", "swim")),
         "llm_provider": env("LLM_PROVIDER", "none").lower(),
         "anthropic_key": env("ANTHROPIC_API_KEY"),
         "anthropic_model": env("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
@@ -87,6 +96,24 @@ def parse_ranking(text: str) -> list[dict]:
             "days": int(m.group(4)),
         })
     return sorted(rows.values(), key=lambda r: r["rank"])
+
+
+def parse_today(text: str) -> list[dict]:
+    """Đọc bảng ASCII của /today: | Nick | Time | KC | Pace | Typ |."""
+    rows: list[dict] = []
+    for line in text.splitlines():
+        m = TODAY_ROW_RE.match(line)
+        if not m:
+            continue
+        nick = " ".join(m.group(1).split())
+        if nick.lower() in {"nick", "st"}:
+            continue
+        rows.append({
+            "nick": nick,
+            "distance": float(m.group(3).replace(",", ".")),
+            "type": m.group(5).strip().lower(),
+        })
+    return rows
 
 
 # ----------------------------------------------------------------- Telegram userbot
@@ -151,14 +178,77 @@ def fetch_ranking(retries: int = 3) -> tuple[list[dict], str]:
     raise RuntimeError(f"Không lấy được /ranking: {last}")
 
 
+def _activity_factor(activity_type: str, cfg: dict) -> float:
+    t = activity_type.lower()
+    if any(k in t for k in cfg["daily_swim_types"]):
+        return cfg["daily_swim_factor"]
+    if any(k in t for k in cfg["daily_ride_types"]):
+        return cfg["daily_ride_factor"]
+    return 1.0
+
+
+def compute_daily_from_today(rows: list[dict], cfg: dict) -> dict:
+    totals: dict[str, float] = {}
+    for r in rows:
+        km = r["distance"] * _activity_factor(r["type"], cfg)
+        if km <= 0.005:
+            continue
+        totals[r["nick"]] = totals.get(r["nick"], 0.0) + km
+    deltas = sorted(totals.items(), key=lambda x: -x[1])
+    return {"top": deltas[:3], "active": len(deltas), "sum": sum(totals.values())}
+
+
+async def _fetch_today() -> tuple[list[dict], str]:
+    client = _client()
+    await client.connect()
+    try:
+        if not await client.is_user_authorized():
+            raise RuntimeError("Session Telegram không hợp lệ/hết hạn. Chạy lại: python main.py login rồi cập nhật secret TG_SESSION_STRING")
+        texts: list[str] = []
+        rows: list[dict] = []
+        async with client.conversation(env("TDHT_BOT", "tdht_bot"), timeout=240, exclusive=False) as conv:
+            await conv.send_message("/today")
+            while not rows:
+                msg = await conv.get_response(timeout=90)
+                texts.append(msg.raw_text or "")
+                rows = parse_today("\n".join(texts))
+                if "chưa có" in (msg.raw_text or "").lower():
+                    break
+            while True:
+                try:
+                    msg = await conv.get_response(timeout=6)
+                except asyncio.TimeoutError:
+                    break
+                texts.append(msg.raw_text or "")
+        raw = "\n".join(texts)
+        return parse_today(raw), raw
+    finally:
+        await client.disconnect()
+
+
+def fetch_today(retries: int = 3) -> tuple[list[dict], str]:
+    last: Exception | None = None
+    for i in range(retries):
+        try:
+            return asyncio.run(_fetch_today())
+        except Exception as e:  # noqa: BLE001
+            last = e
+        if i < retries - 1:
+            print(f"Lần {i + 1} thất bại khi lấy /today ({last}), thử lại sau 30s...")
+            time.sleep(30)
+    raise RuntimeError(f"Không lấy được /today: {last}")
+
+
 # ----------------------------------------------------------------- lưu trữ
-def save_snapshot(day: date, rows: list[dict], raw: str) -> Path:
+def save_snapshot(day: date, rows: list[dict], raw: str, daily: dict | None = None, raw_today: str = "") -> Path:
     SNAP_DIR.mkdir(parents=True, exist_ok=True)
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     (RAW_DIR / f"{day.isoformat()}.txt").write_text(raw, encoding="utf-8")
+    if raw_today:
+        (RAW_DIR / f"{day.isoformat()}-today.txt").write_text(raw_today, encoding="utf-8")
     path = SNAP_DIR / f"{day.isoformat()}.json"
     path.write_text(json.dumps({"date": day.isoformat(), "taken_at": datetime.now(TZ).isoformat(),
-                                "rows": rows}, ensure_ascii=False, indent=1), encoding="utf-8")
+                                "rows": rows, "daily": daily}, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
 
 
@@ -208,8 +298,11 @@ def cmd_snapshot(cfg: dict) -> None:
         print("Giải đã kết thúc, bỏ qua snapshot.")
         return
     rows, raw = fetch_ranking()
-    path = save_snapshot(day, rows, raw)
-    print(f"Đã lưu {len(rows)} runner vào {path.name}. Top 3: {[r['nick'] for r in rows[:3]]}")
+    today_rows, raw_today = fetch_today()
+    daily = compute_daily_from_today(today_rows, cfg)
+    path = save_snapshot(day, rows, raw, daily=daily, raw_today=raw_today)
+    print(f"Đã lưu {len(rows)} runner vào {path.name}. Top 3 tổng: {[r['nick'] for r in rows[:3]]}. "
+          f"/today hợp lệ: {daily['active']} người, tổng quy đổi {daily['sum']:.2f} km.")
 
 
 def cmd_post(cfg: dict, dry_run: bool) -> None:
@@ -218,17 +311,23 @@ def cmd_post(cfg: dict, dry_run: bool) -> None:
         print(f"Ngoài thời gian đăng bài ({cfg['start'] + timedelta(days=1)} → {cfg['anniv']}), bỏ qua.")
         return
 
-    snap = load_snapshot(day)
+    report_day = day - timedelta(days=1)
+    snap = load_snapshot(report_day)
     if snap is None:
-        print("Chưa có snapshot hôm nay, lấy ngay...")
-        rows, raw = fetch_ranking()
-        save_snapshot(day, rows, raw)
-        snap = load_snapshot(day)
+        print(f"Chưa có snapshot cho ngày {report_day.isoformat()}.")
+        prev = latest_snapshot_before(day)
+        if prev is None:
+            raise RuntimeError("Không có snapshot nào trước ngày đăng bài.")
+        report_day, snap = prev
+        print(f"Dùng snapshot gần nhất: {report_day.isoformat()}.")
     rows = snap["rows"]
-
-    prev = latest_snapshot_before(day)
-    daily = compute_daily(rows, prev[1]["rows"]) if prev else None
-    ctx = composer.build_context(day, rows, daily, prev[0] if prev else None, cfg)
+    daily = snap.get("daily")
+    prev_date = report_day
+    if daily is None:  # tương thích snapshot cũ chưa có dữ liệu /today
+        prev = latest_snapshot_before(report_day)
+        daily = compute_daily(rows, prev[1]["rows"]) if prev else None
+        prev_date = prev[0] if prev else None
+    ctx = composer.build_context(day, rows, daily, prev_date, cfg)
     draft = composer.compose(ctx)
     text, source = composer.rewrite_with_llm(ctx, draft, recent_posts(), cfg)
 

@@ -2,8 +2,8 @@ name: VTS daily Strava post
 
 on:
   schedule:
-    - cron: "23 17 * * *"   # 00:23 giờ VN – chụp bảng /ranking
-    - cron: "17 23 * * *"   # 06:17 giờ VN – soạn bài và gửi qua Telegram
+    - cron: "30 16 * * *"   # 23:30 giờ VN – chụp /ranking + /today
+    - cron: "0 0 * * *"     # 07:00 giờ VN – soạn bài và gửi qua Telegram
   workflow_dispatch:
     inputs:
       command:
@@ -37,7 +37,7 @@ jobs:
         id: cmd
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then c="${{ inputs.command }}"
-          elif [ "${{ github.event.schedule }}" = "23 17 * * *" ]; then c="snapshot"
+          elif [ "${{ github.event.schedule }}" = "30 16 * * *" ]; then c="snapshot"
           else c="post"; fi
           [ "$c" = "post-dry-run" ] && c="post --dry-run"
           echo "args=$c" >> "$GITHUB_OUTPUT"
