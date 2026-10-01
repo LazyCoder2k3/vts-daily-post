@@ -4,8 +4,8 @@ Mỗi sáng bot soạn một bài đăng cho Club Strava rồi gửi vào Telegr
 
 | Giờ VN (xấp xỉ) | Việc |
 |---|---|
-| 00:23 | Userbot gửi `/ranking` cho @tdht_bot, lưu bảng tổng vào `data/snapshots/` |
-| 06:17 | Top 3 bảng tổng (chỉ tên) + top 3 km hôm qua (hiệu hai snapshot) → soạn bài → gửi Telegram |
+| 23:30 | Userbot gửi `/ranking` + `/today` cho @tdht_bot, lưu bảng tổng và thống kê km ngày (đã quy đổi theo loại vận động) vào `data/snapshots/` |
+| 07:00 | Lấy top 3 bảng tổng + top 3 km hôm qua từ snapshot đêm trước → soạn bài → gửi Telegram |
 
 > Lịch chạy của GitHub đôi khi trễ 5–30 phút vào giờ cao điểm. Đây là chuyện bình thường.
 
@@ -89,5 +89,5 @@ Sau đó bot tự chạy mỗi ngày đến 15/10, rồi tự dừng.
 
 - **Nhận tin "⚠️ Bot bài đăng Strava lỗi"** thì mở tab Actions để xem log của lần chạy đỏ.
 - **Session hết hạn / bị Telegram đăng xuất:** chạy lại bước 3b trong một Codespace mới rồi cập nhật secret `TG_SESSION_STRING`. Telegram → Settings → Devices sẽ hiện phiên này; đừng bấm Terminate.
-- **Bóc tách sai bảng:** phản hồi gốc của @tdht_bot được lưu ở `data/raw/NGÀY.txt`.
+- **Bóc tách sai bảng:** phản hồi gốc của @tdht_bot được lưu ở `data/raw/NGÀY.txt` (ranking) và `data/raw/NGÀY-today.txt` (/today).
 - **Bài đã soạn** được lưu trong `data/posts/`. Muốn soạn lại thì chạy workflow `post` thủ công.
