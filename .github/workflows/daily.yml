@@ -2,8 +2,11 @@ name: VTS daily Strava post
 
 on:
   schedule:
-    - cron: "30 16 * * *"   # 23:30 giờ VN – chụp /ranking + /today
-    - cron: "0 0 * * *"     # 07:00 giờ VN – soạn bài và gửi qua Telegram
+    # GitHub hay trễ nhiều giờ ở phút :00 và :30, nên tránh hai phút đó.
+    # Hai lượt snapshot dự phòng nhau; lượt đúng giờ muộn nhất được giữ.
+    - cron: "20 16 * * *"   # 23:20 giờ VN – chụp /ranking + /today
+    - cron: "50 16 * * *"   # 23:50 giờ VN – chụp lại (số liệu cuối ngày)
+    - cron: "47 23 * * *"   # 06:47 giờ VN – soạn bài và gửi qua Telegram
   workflow_dispatch:
     inputs:
       command:
@@ -35,10 +38,21 @@ jobs:
 
       - name: Chọn lệnh
         id: cmd
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_CMD: ${{ inputs.command }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then c="${{ inputs.command }}"
-          elif [ "${{ github.event.schedule }}" = "30 16 * * *" ]; then c="snapshot"
-          else c="post"; fi
+          echo "Bắt đầu lúc (giờ VN): $(TZ=Asia/Ho_Chi_Minh date '+%Y-%m-%d %H:%M:%S')"
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            c="$INPUT_CMD"
+          else
+            case "$SCHEDULE" in
+              "20 16 * * *"|"50 16 * * *") c="snapshot" ;;
+              "47 23 * * *") c="post" ;;
+              *) echo "::error::Lịch không nhận diện được: '$SCHEDULE'"; exit 1 ;;
+            esac
+          fi
           [ "$c" = "post-dry-run" ] && c="post --dry-run"
           echo "args=$c" >> "$GITHUB_OUTPUT"
           echo "Lệnh: $c"
@@ -65,4 +79,8 @@ jobs:
           git add data || exit 0
           if git diff --cached --quiet; then echo "Không có dữ liệu mới"; exit 0; fi
           git commit -m "data: $(TZ=Asia/Ho_Chi_Minh date '+%Y-%m-%d %H:%M')"
-          git pull --rebase && git push
+          for i in 1 2 3 4; do
+            git pull --rebase && git push && exit 0
+            echo "Push lần $i thất bại, thử lại..."; sleep $((i * 5))
+          done
+          echo "::error::Không push được dữ liệu lên repo"; exit 1
