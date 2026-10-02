@@ -2,10 +2,15 @@
 """VTS Running Club — bot soạn bài đăng Strava hằng ngày.
 
 Luồng hoạt động:
-  23:30  `snapshot`  userbot gửi /ranking + /today cho @tdht_bot, lưu bảng tổng
+  23:20 + 23:50  `snapshot`  userbot gửi /ranking + /today cho @tdht_bot, lưu bảng tổng
                      và thống kê km trong ngày (đã quy đổi theo loại vận động).
-  07:00  `post`      dùng snapshot đêm qua để lấy top 3 bảng tổng và top 3 km hôm qua,
-                     soạn bài, gửi bản nháp qua Telegram cho admin.
+                     Hai lượt dự phòng nhau vì GitHub Actions hay chạy trễ; lượt đúng giờ
+                     muộn nhất được giữ. Chạy sau 0h thì /today đã sang ngày mới nên bot
+                     KHÔNG dùng nó: snapshot được gán cho ngày hôm trước, gắn cờ "late"
+                     và bài đăng sẽ ước tính km ngày bằng chênh lệch bảng tổng.
+  06:47  `post`      dùng snapshot đêm qua để lấy top 3 bảng tổng và top 3 km hôm qua,
+                     soạn bài, gửi bản nháp qua Telegram cho admin (kèm cảnh báo nếu
+                     dữ liệu bị suy giảm).
 
 Lệnh:
   python main.py login            Đăng nhập userbot Telegram (1 lần, cần OTP) -> in ra TG_SESSION_STRING
@@ -36,6 +41,8 @@ BASE = Path(__file__).resolve().parent
 load_dotenv(BASE / ".env")
 
 TZ = ZoneInfo("Asia/Ho_Chi_Minh")
+# Snapshot chạy trước giờ này (giờ VN) được coi là chạy trễ của đêm hôm trước.
+LATE_UNTIL_HOUR = int(os.getenv("SNAPSHOT_LATE_UNTIL_HOUR") or 6)
 DATA = BASE / "data"
 SNAP_DIR, POST_DIR, RAW_DIR = DATA / "snapshots", DATA / "posts", DATA / "raw"
 
@@ -136,6 +143,11 @@ async def _login() -> None:
     print("=== hết ===")
 
 
+def _no_reply_msg(cmd: str, texts: list[str]) -> str:
+    got = " | ".join(" ".join(t.split())[:120] for t in texts[-3:]) or "(không nhận được tin nào)"
+    return f"@tdht_bot không trả bảng {cmd} trong 90s. Tin đã nhận: {got}"
+
+
 async def _fetch_ranking() -> tuple[list[dict], str]:
     client = _client()
     await client.connect()
@@ -147,7 +159,10 @@ async def _fetch_ranking() -> tuple[list[dict], str]:
         async with client.conversation(env("TDHT_BOT", "tdht_bot"), timeout=240, exclusive=False) as conv:
             await conv.send_message("/ranking")
             while not rows:  # bỏ qua tin "Xoay màn hình để xem", chờ tới khi có bảng
-                msg = await conv.get_response(timeout=90)
+                try:
+                    msg = await conv.get_response(timeout=90)
+                except asyncio.TimeoutError:
+                    raise RuntimeError(_no_reply_msg("/ranking", texts)) from None
                 texts.append(msg.raw_text or "")
                 rows = parse_ranking("\n".join(texts))
             while True:  # gom thêm nếu bảng bị tách thành nhiều tin nhắn
@@ -209,7 +224,10 @@ async def _fetch_today() -> tuple[list[dict], str]:
         async with client.conversation(env("TDHT_BOT", "tdht_bot"), timeout=240, exclusive=False) as conv:
             await conv.send_message("/today")
             while not rows:
-                msg = await conv.get_response(timeout=90)
+                try:
+                    msg = await conv.get_response(timeout=90)
+                except asyncio.TimeoutError:
+                    raise RuntimeError(_no_reply_msg("/today", texts)) from None
                 texts.append(msg.raw_text or "")
                 rows = parse_today("\n".join(texts))
                 if "chưa có" in (msg.raw_text or "").lower():
@@ -240,7 +258,8 @@ def fetch_today(retries: int = 3) -> tuple[list[dict], str]:
 
 
 # ----------------------------------------------------------------- lưu trữ
-def save_snapshot(day: date, rows: list[dict], raw: str, daily: dict | None = None, raw_today: str = "") -> Path:
+def save_snapshot(day: date, rows: list[dict], raw: str, daily: dict | None = None, raw_today: str = "",
+                  late: bool = False, warnings: list[str] | None = None) -> Path:
     SNAP_DIR.mkdir(parents=True, exist_ok=True)
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     (RAW_DIR / f"{day.isoformat()}.txt").write_text(raw, encoding="utf-8")
@@ -248,6 +267,7 @@ def save_snapshot(day: date, rows: list[dict], raw: str, daily: dict | None = No
         (RAW_DIR / f"{day.isoformat()}-today.txt").write_text(raw_today, encoding="utf-8")
     path = SNAP_DIR / f"{day.isoformat()}.json"
     path.write_text(json.dumps({"date": day.isoformat(), "taken_at": datetime.now(TZ).isoformat(),
+                                "late": late, "warnings": warnings or [],
                                 "rows": rows, "daily": daily}, ensure_ascii=False, indent=1), encoding="utf-8")
     return path
 
@@ -288,21 +308,62 @@ def notify(text: str) -> None:
         return
     r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
                       json={"chat_id": chat, "text": text, "disable_web_page_preview": True}, timeout=30)
-    r.raise_for_status()
+    if not r.ok:
+        raise RuntimeError(f"Telegram từ chối tin nhắn (HTTP {r.status_code}): {r.text[:300]}")
 
 
 # ----------------------------------------------------------------- lệnh
 def cmd_snapshot(cfg: dict) -> None:
-    day = today_vn()
+    now = datetime.now(TZ)
+    late = now.hour < LATE_UNTIL_HOUR
+    # Chạy trễ qua 0h: số liệu thuộc về ngày hôm trước, không phải "hôm nay".
+    day = now.date() - timedelta(days=1) if late else now.date()
     if day > cfg["anniv"] + timedelta(days=1):
         print("Giải đã kết thúc, bỏ qua snapshot.")
         return
+
+    existing = load_snapshot(day)
+    if late and existing is not None and not existing.get("late"):
+        print(f"Đã có snapshot đúng giờ của {day.isoformat()} (lúc {existing.get('taken_at')}), "
+              "lượt trễ này không ghi đè.")
+        return
+
+    warnings: list[str] = []
     rows, raw = fetch_ranking()
-    today_rows, raw_today = fetch_today()
-    daily = compute_daily_from_today(today_rows, cfg)
-    path = save_snapshot(day, rows, raw, daily=daily, raw_today=raw_today)
-    print(f"Đã lưu {len(rows)} runner vào {path.name}. Top 3 tổng: {[r['nick'] for r in rows[:3]]}. "
-          f"/today hợp lệ: {daily['active']} người, tổng quy đổi {daily['sum']:.2f} km.")
+    today_rows: list[dict] = []
+    raw_today = ""
+    daily: dict | None = None
+    if late:
+        # /today lúc này đã là ngày mới (gần như trống): dùng nó sẽ làm mất km của ngày cũ.
+        msg = (f"Snapshot ngày {day.isoformat()} chạy TRỄ lúc {now:%H:%M %d/%m} (giờ VN), đã qua 0h nên không dùng "
+               "/today. Km trong ngày sẽ được ước tính từ chênh lệch bảng tổng, chưa chắc khớp quy đổi.")
+        warnings.append(msg)
+        print("⚠️ " + msg)
+    else:
+        try:
+            today_rows, raw_today = fetch_today()
+            if datetime.now(TZ).date() != day:
+                raise RuntimeError("/today trả về sau 0h nên đã sang ngày mới")
+            daily = compute_daily_from_today(today_rows, cfg)
+        except Exception as e:  # noqa: BLE001
+            raw_today = ""
+            msg = f"Không lấy được /today ngày {day.isoformat()} ({e}); vẫn lưu /ranking."
+            if existing is not None and existing.get("daily") is not None:
+                daily = existing["daily"]
+                msg += f" Giữ km ngày từ lượt chạy trước ({existing.get('taken_at')})."
+            else:
+                msg += " Km ngày sẽ được ước tính từ chênh lệch bảng tổng."
+            warnings.append(msg)
+            print("⚠️ " + msg)
+
+    path = save_snapshot(day, rows, raw, daily=daily, raw_today=raw_today, late=late, warnings=warnings)
+    info = f"/today hợp lệ: {daily['active']} người, tổng quy đổi {daily['sum']:.2f} km." if daily else "Không có /today."
+    print(f"Đã lưu {len(rows)} runner vào {path.name}. Top 3 tổng: {[r['nick'] for r in rows[:3]]}. {info}")
+    if warnings:
+        try:
+            notify("⚠️ Dữ liệu snapshot bị suy giảm:\n" + "\n".join(warnings))
+        except Exception as e:  # noqa: BLE001
+            print(f"(Không gửi được cảnh báo Telegram: {e})")
 
 
 def cmd_post(cfg: dict, dry_run: bool) -> None:
@@ -311,22 +372,31 @@ def cmd_post(cfg: dict, dry_run: bool) -> None:
         print(f"Ngoài thời gian đăng bài ({cfg['start'] + timedelta(days=1)} → {cfg['anniv']}), bỏ qua.")
         return
 
+    warnings: list[str] = []
     report_day = day - timedelta(days=1)
     snap = load_snapshot(report_day)
     if snap is None:
-        print(f"Chưa có snapshot cho ngày {report_day.isoformat()}.")
         prev = latest_snapshot_before(day)
         if prev is None:
             raise RuntimeError("Không có snapshot nào trước ngày đăng bài.")
+        warnings.append(f"Không có snapshot ngày {report_day.isoformat()}, đang dùng snapshot {prev[0].isoformat()} "
+                        "nên bảng xếp hạng và km trong ngày đều CŨ. Kiểm tra tab Actions.")
         report_day, snap = prev
-        print(f"Dùng snapshot gần nhất: {report_day.isoformat()}.")
+    warnings += snap.get("warnings") or []
+
     rows = snap["rows"]
     daily = snap.get("daily")
     prev_date = report_day
-    if daily is None:  # tương thích snapshot cũ chưa có dữ liệu /today
+    if daily is None:  # snapshot trễ / /today lỗi / snapshot cũ: ước tính bằng chênh lệch bảng tổng
         prev = latest_snapshot_before(report_day)
-        daily = compute_daily(rows, prev[1]["rows"]) if prev else None
-        prev_date = prev[0] if prev else None
+        if prev:
+            daily = compute_daily(rows, prev[1]["rows"])
+            prev_date = report_day if prev[0] == report_day - timedelta(days=1) else prev[0]
+            warnings.append(f"Km trong ngày là ƯỚC TÍNH từ chênh lệch bảng tổng {prev[0].isoformat()} → "
+                            f"{report_day.isoformat()} (đạp xe/bơi có thể chưa quy đổi đúng).")
+        else:
+            prev_date = None
+            warnings.append("Chưa có snapshot hôm trước nên không có mục top km trong ngày.")
     ctx = composer.build_context(day, rows, daily, prev_date, cfg)
     draft = composer.compose(ctx)
     text, source = composer.rewrite_with_llm(ctx, draft, recent_posts(), cfg)
@@ -336,10 +406,12 @@ def cmd_post(cfg: dict, dry_run: bool) -> None:
 
     if dry_run:
         print(f"[nguồn: {source}]\n{text}")
+        for w in warnings:
+            print(f"⚠️ {w}")
         return
     note = f"📋 Bài đăng Strava {composer.dmy(day)} (nguồn: {source}). Chạm giữ tin bên dưới → Sao chép → dán vào Club."
-    if daily is None:
-        note += "\n⚠️ Chưa có snapshot hôm trước nên chưa có mục top km trong ngày."
+    if warnings:
+        note += "\n\n⚠️ Dữ liệu bị suy giảm, kiểm tra trước khi đăng:\n" + "\n".join(f"• {w}" for w in warnings)
     notify(note)
     notify(text)
     print("Đã gửi bài qua Telegram.")

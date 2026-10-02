@@ -4,10 +4,16 @@ Mỗi sáng bot soạn một bài đăng cho Club Strava rồi gửi vào Telegr
 
 | Giờ VN (xấp xỉ) | Việc |
 |---|---|
-| 23:30 | Userbot gửi `/ranking` + `/today` cho @tdht_bot, lưu bảng tổng và thống kê km ngày (đã quy đổi theo loại vận động) vào `data/snapshots/` |
-| 07:00 | Lấy top 3 bảng tổng + top 3 km hôm qua từ snapshot đêm trước → soạn bài → gửi Telegram |
+| 23:20 và 23:50 | Userbot gửi `/ranking` + `/today` cho @tdht_bot, lưu bảng tổng và thống kê km ngày (đã quy đổi theo loại vận động) vào `data/snapshots/`. Hai lượt dự phòng nhau, lượt đúng giờ muộn nhất được giữ |
+| 06:47 | Lấy top 3 bảng tổng + top 3 km hôm qua từ snapshot đêm trước → soạn bài → gửi Telegram |
 
-> Lịch chạy của GitHub đôi khi trễ 5–30 phút vào giờ cao điểm. Đây là chuyện bình thường.
+> ⚠️ Lịch `schedule` của GitHub **không đảm bảo giờ chạy**: thực tế đã trễ 3–4 tiếng nhiều ngày liền.
+> Vì `/today` chỉ trả về "hôm nay", snapshot chạy sau 0h sẽ mất km của ngày hôm trước. Bot xử lý như sau:
+>
+> - Snapshot chạy **trước 06:00 giờ VN** được coi là chạy trễ của đêm hôm trước: lưu vào ngày hôm trước, gắn cờ `late`, **không dùng `/today`** và không ghi đè snapshot đúng giờ nếu đã có.
+> - Khi đó bài đăng ước tính km ngày bằng chênh lệch bảng tổng giữa hai snapshot, và tin nhắn gửi cho admin có dòng **"⚠️ Dữ liệu bị suy giảm"** nêu rõ lý do (snapshot trễ, `/today` lỗi, thiếu snapshot hôm qua...).
+> - Nếu `/today` lỗi nhưng `/ranking` ổn, bot vẫn lưu `/ranking` thay vì bỏ cả lượt.
+> - Giờ bắt đầu thực của mỗi lượt được in ở bước "Chọn lệnh" trong log Actions.
 
 ---
 
@@ -85,7 +91,22 @@ Sau đó bot tự chạy mỗi ngày đến 15/10, rồi tự dừng.
 
 ---
 
+## Chạy đúng giờ 23:50 bằng trigger ngoài (khuyến nghị)
+
+Cách duy nhất để chốt số liệu đúng giờ là gọi `workflow_dispatch` từ bên ngoài, thường chạy trong vài giây.
+
+1. GitHub → Settings → Developer settings → Fine-grained tokens: tạo token chỉ cho repo này, quyền **Actions: Read and write**. Token lưu ở phía bạn, đừng gửi cho ai.
+2. Trên https://cron-job.org (hoặc crontab của một máy luôn bật) tạo job lúc **23:50, múi giờ Asia/Ho_Chi_Minh**:
+   - URL: `https://api.github.com/repos/<owner>/vts-daily-post/actions/workflows/daily.yml/dispatches`
+   - Method `POST`, header `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`
+   - Body: `{"ref":"main","inputs":{"command":"snapshot"}}`
+
+Các lượt `schedule` trong workflow vẫn giữ làm dự phòng.
+
 ## Xử lý sự cố
+
+- **Bài/tin cảnh báo có dòng "⚠️ Dữ liệu bị suy giảm"** nghĩa là snapshot trễ hoặc thiếu; km trong ngày chỉ là ước tính.
+- **Lỗi "@tdht_bot không trả bảng ... trong 90s"**: log kèm các tin bot đã trả lời, xem đó để biết bot im lặng hay đổi định dạng. Lượt chạy bị lỗi này sẽ tốn ~6 phút vì retry.
 
 - **Nhận tin "⚠️ Bot bài đăng Strava lỗi"** thì mở tab Actions để xem log của lần chạy đỏ.
 - **Session hết hạn / bị Telegram đăng xuất:** chạy lại bước 3b trong một Codespace mới rồi cập nhật secret `TG_SESSION_STRING`. Telegram → Settings → Devices sẽ hiện phiên này; đừng bấm Terminate.
