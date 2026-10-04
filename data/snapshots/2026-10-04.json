@@ -1,9 +1,9 @@
 {
  "date": "2026-10-04",
- "taken_at": "2026-10-05T02:40:44.371951+07:00",
+ "taken_at": "2026-10-05T02:49:39.934705+07:00",
  "late": true,
  "warnings": [
-  "Snapshot ngày 2026-10-04 chạy TRỄ lúc 02:40 05/10 (giờ VN), đã qua 0h nên không dùng /today. Km trong ngày sẽ được ước tính từ chênh lệch bảng tổng, chưa chắc khớp quy đổi."
+  "Snapshot ngày 2026-10-04 chạy TRỄ lúc 02:49 05/10 (giờ VN), đã qua 0h nên không dùng /today. Km trong ngày sẽ được ước tính từ chênh lệch bảng tổng, chưa chắc khớp quy đổi."
  ],
  "rows": [
   {
