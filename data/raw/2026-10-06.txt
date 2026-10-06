@@ -1,0 +1,33 @@
+Xoay màn hình để xem
++----+---------------------+--------+------+
+| ST |         Nick        |  Tổng  | Days |
++----+---------------------+--------+------+
+| 1  |  Quang Vinh Trương  | 354.33 |  30  |
+| 2  |      hon hoang      | 249.52 |  30  |
+| 3  |    Tuan Nguyen Tu   | 165.06 |  17  |
+| 4  |      Dang Duong     | 115.64 |  17  |
+| 5  |   Thái Nguyễn Văn   | 114.29 |  13  |
+| 6  |      Phung Qui      | 87.19  |  21  |
+| 7  |       Đức Phan      | 74.82  |  16  |
+| 8  |     Nhân Nguyễn     | 71.05  |  12  |
+| 9  |  Nguyen Trung Thanh | 63.95  |  11  |
+| 10 |      Pham Tranh     | 52.24  |  13  |
+| 11 |     châu la kim     | 52.07  |  12  |
+| 12 |       Phan Hoi      | 51.24  |  12  |
+| 13 |   Duong Nguyen Quy  | 45.42  |  12  |
+| 14 |   Bang Huynh Ngoc   | 36.27  |  14  |
+| 15 | Nguyễn Trường Giang | 21.64  |  12  |
+| 16 |        Dat Ho       | 19.85  |  4   |
+| 17 |     Khoa Nguyen     | 19.65  |  6   |
+| 18 |  Nguyễn Trọng  Hoàn | 15.78  |  3   |
+| 19 |    Anh Tú Nguyễn    | 12.15  |  4   |
+| 20 |      Anh Nguyen     |  9.94  |  4   |
+| 21 |   Bao Trung Nguyen  |  7.08  |  4   |
+| 22 |  Thao Truong Phuong |  6.82  |  5   |
+| 23 |    ĐHML- minhld1    |  4.72  |  1   |
+| 24 |     Điển Trương     |  4.04  |  2   |
+| 25 |      Huymd1 TH      |  3.19  |  1   |
+| 26 |    Quochv1 -DHML    |  2.70  |  1   |
+| 27 |     HT- Changem     |  1.71  |  1   |
+| 28 |      dieudx1 TD     |  1.27  |  1   |
++----+---------------------+--------+------+
