@@ -1,0 +1,179 @@
+{
+ "date": "2026-10-10",
+ "taken_at": "2026-10-11T03:05:27.337482+07:00",
+ "late": true,
+ "warnings": [
+  "Snapshot ngày 2026-10-10 chạy TRỄ lúc 03:05 11/10 (giờ VN), đã qua 0h nên không dùng /today. Km trong ngày sẽ được ước tính từ chênh lệch bảng tổng, chưa chắc khớp quy đổi."
+ ],
+ "rows": [
+  {
+   "rank": 1,
+   "nick": "Quang Vinh Trương",
+   "total": 361.15,
+   "days": 30
+  },
+  {
+   "rank": 2,
+   "nick": "hon hoang",
+   "total": 266.21,
+   "days": 30
+  },
+  {
+   "rank": 3,
+   "nick": "Tuan Nguyen Tu",
+   "total": 165.06,
+   "days": 17
+  },
+  {
+   "rank": 4,
+   "nick": "Thái Nguyễn Văn",
+   "total": 136.08,
+   "days": 15
+  },
+  {
+   "rank": 5,
+   "nick": "Dang Duong",
+   "total": 131.09,
+   "days": 18
+  },
+  {
+   "rank": 6,
+   "nick": "Phung Qui",
+   "total": 99.19,
+   "days": 21
+  },
+  {
+   "rank": 7,
+   "nick": "Đức Phan",
+   "total": 86.82,
+   "days": 18
+  },
+  {
+   "rank": 8,
+   "nick": "Nhân Nguyễn",
+   "total": 76.06,
+   "days": 13
+  },
+  {
+   "rank": 9,
+   "nick": "Nguyen Trung Thanh",
+   "total": 63.95,
+   "days": 11
+  },
+  {
+   "rank": 10,
+   "nick": "Phan Hoi",
+   "total": 59.16,
+   "days": 14
+  },
+  {
+   "rank": 11,
+   "nick": "Pham Tranh",
+   "total": 58.39,
+   "days": 16
+  },
+  {
+   "rank": 12,
+   "nick": "châu la kim",
+   "total": 56.98,
+   "days": 14
+  },
+  {
+   "rank": 13,
+   "nick": "Duong Nguyen Quy",
+   "total": 45.42,
+   "days": 12
+  },
+  {
+   "rank": 14,
+   "nick": "Bang Huynh Ngoc",
+   "total": 40.72,
+   "days": 15
+  },
+  {
+   "rank": 15,
+   "nick": "Khoa Nguyen",
+   "total": 21.82,
+   "days": 7
+  },
+  {
+   "rank": 16,
+   "nick": "Nguyễn Trường Giang",
+   "total": 21.64,
+   "days": 12
+  },
+  {
+   "rank": 17,
+   "nick": "Dat Ho",
+   "total": 19.85,
+   "days": 4
+  },
+  {
+   "rank": 18,
+   "nick": "Nguyễn Trọng Hoàn",
+   "total": 15.78,
+   "days": 3
+  },
+  {
+   "rank": 19,
+   "nick": "Anh Tú Nguyễn",
+   "total": 14.34,
+   "days": 5
+  },
+  {
+   "rank": 20,
+   "nick": "Anh Nguyen",
+   "total": 9.94,
+   "days": 4
+  },
+  {
+   "rank": 21,
+   "nick": "Thao Truong Phuong",
+   "total": 7.82,
+   "days": 6
+  },
+  {
+   "rank": 22,
+   "nick": "Bao Trung Nguyen",
+   "total": 7.08,
+   "days": 4
+  },
+  {
+   "rank": 23,
+   "nick": "ĐHML- minhld1",
+   "total": 4.72,
+   "days": 1
+  },
+  {
+   "rank": 24,
+   "nick": "Điển Trương",
+   "total": 4.04,
+   "days": 2
+  },
+  {
+   "rank": 25,
+   "nick": "Huymd1 TH",
+   "total": 3.19,
+   "days": 1
+  },
+  {
+   "rank": 26,
+   "nick": "Quochv1 -DHML",
+   "total": 2.7,
+   "days": 1
+  },
+  {
+   "rank": 27,
+   "nick": "HT- Changem",
+   "total": 1.71,
+   "days": 1
+  },
+  {
+   "rank": 28,
+   "nick": "dieudx1 TD",
+   "total": 1.27,
+   "days": 1
+  }
+ ],
+ "daily": null
+}
