@@ -1,6 +1,6 @@
 {
  "date": "2026-10-13",
- "taken_at": "2026-10-13T06:06:59.977950+07:00",
+ "taken_at": "2026-10-13T06:22:39.855355+07:00",
  "late": false,
  "warnings": [
   "Không lấy được /today ngày 2026-10-13 (Không lấy được /today: @tdht_bot không trả bảng /today trong 90s. Tin đã nhận: Xoay màn hình để xem | +------+------+----+------+-----+ | Nick | Time | KC | Pace | Typ | +------+------+----+------+-----+ +------+------+---); vẫn lưu /ranking. Km ngày sẽ được ước tính từ chênh lệch bảng tổng."
