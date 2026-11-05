@@ -1,5 +1,19 @@
+# bí mật
 .env
 *.session
+
+# dữ liệu chạy (SQLite + backup)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/backups/
+
+# python
 .venv/
+venv/
 __pycache__/
+*.pyc
+.pytest_cache/
+
+# khác
 *.zip
