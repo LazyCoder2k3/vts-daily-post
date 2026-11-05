@@ -1,0 +1,48 @@
+# Bộ luật mặc định (theo quy chế giải 2026). Sửa qua Telegram: /rules set <đường.dẫn> <giá trị>
+event:
+  name: "Giải chạy VTS Running Club"
+  start: 2027-01-01
+  end: 2027-01-31
+  timezone: Asia/Ho_Chi_Minh
+  grace_days: 2
+  target_km: 45
+
+general:
+  require_gps_map: true
+  reject_manual: true
+  reject_flagged: true
+  trainer_policy: reject
+  pace_basis: moving
+  overlap_policy: reject_later
+  daily_cap_km: null
+  min_moving_ratio: null
+  allowed_visibility: null
+
+sports:
+  - key: run
+    types: [Run, TrailRun, Walk, Hike]
+    factor: 1.0
+    min_distance_km: 1.0
+    pace_unit: per_km
+    pace_min: "4:00"
+    pace_max: "17:00"
+  - key: ride
+    types: [Ride, GravelRide, MountainBikeRide]
+    factor: 0.25
+    min_distance_km: 4.0
+    pace_unit: per_km
+    pace_min: "1:30"
+    pace_max: "10:00"
+  - key: swim
+    types: [Swim]
+    factor: 4.0
+    min_distance_km: 0.1
+    pace_unit: per_100m
+    pace_min: "1:15"
+    pace_max: "4:00"
+
+excluded_types: [VirtualRide, VirtualRun, EBikeRide, Elliptical, StairStepper, WeightTraining, Yoga, Workout]
+
+awards:
+  streak_days: 25
+  female_target_km: 45
