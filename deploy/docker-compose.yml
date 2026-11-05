@@ -1,0 +1,60 @@
+# Bot VTS Running Club + Caddy (HTTPS tự động).
+#
+# Chạy từ GỐC repo. Compose chỉ đọc file .env để thay ${DOMAIN} trong THƯ MỤC CHỨA FILE COMPOSE
+# (deploy/), nên phải chỉ rõ --env-file:
+#
+#   alias dc='docker compose --env-file .env -f deploy/docker-compose.yml'
+#   dc up -d --build
+#   dc logs -f app
+#   dc exec app python -m app.cli webhook subscribe
+#
+# Cần trong .env: DOMAIN=run.example.com (DNS trỏ về máy chủ) và PUBLIC_BASE_URL=https://run.example.com
+
+name: vts-bot
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: vts-bot:latest
+    container_name: vts-app
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      # Ghi đè .env: DB và backup nằm trong volume /app/data (thư mục ./data của repo trên máy chủ)
+      DATABASE_URL: sqlite+aiosqlite:////app/data/vts.db
+      BACKUP_DIR: /app/data/backups
+    volumes:
+      - ../data:/app/data
+    expose:
+      - "8080"
+    # Bỏ comment nếu muốn gọi thẳng http://127.0.0.1:8080/health từ máy chủ (không qua Caddy)
+    # ports:
+    #   - "127.0.0.1:8080:8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2
+    container_name: vts-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Thiếu DOMAIN trong .env (chạy với --env-file .env)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

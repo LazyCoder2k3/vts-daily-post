@@ -288,3 +288,9 @@ vts-daily-post/
 - Strava API Agreement (hiệu lực 01/06/2026, "chỉ hiển thị cho chính user"): https://www.strava.com/legal/api
 - Thảo luận cộng đồng về leaderboard club trong Standard Tier và cache 7 ngày (chưa có trả lời chính thức): https://communityhub.strava.com/developers-api-7/standard-tier-showing-members-activities-in-a-private-club-group-retention-beyond-the-7-day-cache-14100
 - Tổng hợp thay đổi 2026 (bên thứ ba): https://appsforstrava.com/blog/strava-developer-program-changes-2026 , https://tryterra.co/blog/strava-api-changes-2026
+
+---
+
+## Trạng thái 05/11/2026
+
+Đã implement **GĐ1–GĐ3** trong repo này: OAuth từng runner + webhook, rule engine YAML có version, lệnh runner/admin trên Telegram, đối soát định kỳ, bài đăng sáng, backup, CLI, Docker Compose với Caddy hoặc Cloudflare Tunnel. Cách cài đặt và vận hành xem [README](../README.md), [docs/VAN_HANH.md](VAN_HANH.md), [docs/HUONG_DAN_RUNNER.md](HUONG_DAN_RUNNER.md). Code cũ nằm ở `legacy/`. GĐ4 (mời toàn bộ runner, chạy song song rồi tắt luồng cũ) chưa thực hiện.

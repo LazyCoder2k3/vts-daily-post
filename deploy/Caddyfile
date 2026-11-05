@@ -1,0 +1,7 @@
+# Caddy tự xin và gia hạn chứng chỉ Let's Encrypt cho {$DOMAIN}.
+# DOMAIN lấy từ biến môi trường của container caddy (đặt trong .env ở gốc repo).
+# Yêu cầu: DNS A/AAAA của DOMAIN trỏ về máy chủ, cổng 80 và 443 mở.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8080
+}

@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+*.session
+*.zip
+data/
+legacy/
+docs/
+deploy/
+!deploy/Dockerfile
+*.md

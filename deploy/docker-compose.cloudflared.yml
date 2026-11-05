@@ -1,0 +1,42 @@
+# Bot VTS Running Club + Cloudflare Tunnel (không cần mở cổng 80/443, không cần IP công khai).
+#
+# Chuẩn bị trên Cloudflare Zero Trust -> Networks -> Tunnels -> Create a tunnel (Cloudflared):
+#   - Lấy token của tunnel, đặt vào .env: CF_TUNNEL_TOKEN=...
+#   - Public Hostname: run.example.com  ->  Service: HTTP  ->  URL: app:8080
+#   - PUBLIC_BASE_URL=https://run.example.com trong .env
+#
+# Chạy từ GỐC repo:
+#   alias dc='docker compose --env-file .env -f deploy/docker-compose.cloudflared.yml'
+#   dc up -d --build
+
+name: vts-bot
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: vts-bot:latest
+    container_name: vts-app
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////app/data/vts.db
+      BACKUP_DIR: /app/data/backups
+    volumes:
+      - ../data:/app/data
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vts-cloudflared
+    restart: unless-stopped
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN:?Thiếu CF_TUNNEL_TOKEN trong .env (chạy với --env-file .env)}
