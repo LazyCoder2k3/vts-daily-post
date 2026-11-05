@@ -112,3 +112,9 @@ Các lượt `schedule` trong workflow vẫn giữ làm dự phòng.
 - **Session hết hạn / bị Telegram đăng xuất:** chạy lại bước 3b trong một Codespace mới rồi cập nhật secret `TG_SESSION_STRING`. Telegram → Settings → Devices sẽ hiện phiên này; đừng bấm Terminate.
 - **Bóc tách sai bảng:** phản hồi gốc của @tdht_bot được lưu ở `data/raw/NGÀY.txt` (ranking) và `data/raw/NGÀY-today.txt` (/today).
 - **Bài đã soạn** được lưu trong `data/posts/`. Muốn soạn lại thì chạy workflow `post` thủ công.
+
+---
+
+## Kế hoạch phát triển tiếp
+
+Bot hiện tại phụ thuộc vào @tdht_bot. Kế hoạch xây bot độc lập lấy dữ liệu trực tiếp từ Strava (OAuth từng runner + webhook, bộ luật cấu hình được) nằm ở [`docs/KE_HOACH_BOT_STRAVA.md`](docs/KE_HOACH_BOT_STRAVA.md).
