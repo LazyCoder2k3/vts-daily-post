@@ -122,7 +122,7 @@ class Activity(Base):
     device_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     upload_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    raw_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)         # xoá sau raw_retention_days
+    raw_json: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)  # xoá sau raw_retention_days
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
