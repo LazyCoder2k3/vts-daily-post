@@ -5,9 +5,10 @@ Mọi module lấy cấu hình qua `get_settings()`; test có thể gọi `reset
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
 
     # ----- Telegram
     telegram_bot_token: str = ""
-    admin_telegram_ids: list[int] = Field(default_factory=list)
+    admin_telegram_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
     group_chat_id: int | None = None
     notify_rejected_dm: bool = True      # nhắn riêng runner khi hoạt động bị loại
     notify_valid_dm: bool = False        # nhắn riêng runner khi hoạt động hợp lệ
@@ -66,8 +67,10 @@ class Settings(BaseSettings):
     @field_validator("admin_telegram_ids", mode="before")
     @classmethod
     def _split_ids(cls, v):
+        if isinstance(v, int):
+            return [v]
         if isinstance(v, str):
-            return [int(x) for x in v.replace(";", ",").split(",") if x.strip()]
+            return [int(x) for x in v.replace(";", ",").replace("[", "").replace("]", "").split(",") if x.strip()]
         return v
 
     @property

@@ -14,7 +14,7 @@ from datetime import date, datetime
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 
 PaceUnit = Literal["per_km", "per_100m"]
 
@@ -168,8 +168,16 @@ class RuleSetConfig(BaseModel):
             raise KeyError("Hãy chỉ rõ trường: sports.<key>.<field>")
         if not isinstance(node, dict) or (last not in node and last != "__new__"):
             raise KeyError(f"Không có mục '{last}'")
-        node[last] = coerce_value(value, node.get(last))
-        return RuleSetConfig.model_validate(copy.deepcopy(data))
+        coerced = coerce_value(value, node.get(last))
+        node[last] = coerced
+        try:
+            return RuleSetConfig.model_validate(copy.deepcopy(data))
+        except ValidationError:
+            # Trường đang null nhưng kiểu là list (vd allowed_visibility): thử tách chuỗi thành list
+            if isinstance(coerced, str):
+                node[last] = [x.strip() for x in coerced.strip("[]").split(",") if x.strip()]
+                return RuleSetConfig.model_validate(copy.deepcopy(data))
+            raise
 
 
 def coerce_value(value: Any, current: Any) -> Any:
@@ -287,6 +295,7 @@ REASONS: dict[str, str] = {
     "LOW_MOVING_RATIO": "thời gian dừng quá nhiều",
     "OVERLAP": "trùng thời gian với hoạt động khác",
     "DAILY_CAP": "vượt giới hạn km trong ngày",
+    "DAILY_CAP_TRIMMED": "đã cắt theo giới hạn km trong ngày",
     "VISIBILITY": "chế độ hiển thị không được tính",
     "ADMIN_EXCLUDED": "ban tổ chức loại",
     "DELETED": "đã xoá trên Strava",
